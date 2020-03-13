@@ -1,0 +1,289 @@
+---
+title: "sealey-briana-ADA-homework-2"
+author: "Briana Sealey"
+date: "3/2/2020"
+output: html_document
+---
+##Challenge 1
+```{r}
+#loading required packages
+library(readr)
+library(dplyr)
+library(ggplot2)
+library(manipulate)
+library(mosaic)
+
+#import movie data
+f <- "https://raw.githubusercontent.com/difiore/ADA-datasets/master/IMDB-movies.csv"
+d <- read_csv(f, col_names = TRUE)
+#Part 1, Filter data
+d2 <- filter(d, 1919 < startYear & startYear < 1980 & runtimeMinutes < 240) %>%
+  mutate(decade = case_when(startYear %in% 1920:1929 ~ "20s",
+                            startYear %in% 1930:1939 ~ "30s",
+                            startYear %in% 1940:1949 ~ "40s",
+                            startYear %in% 1950:1959 ~ "50s",
+                            startYear %in% 1960:1969 ~ "60s",
+                            startYear %in% 1970:1979 ~ "70s"))
+#check to see if it worked
+table(d2$decade)
+
+#Part 2, Histogram of runtimeMinutes
+p <- ggplot(d2, aes(x=runtimeMinutes)) +
+  geom_histogram(color="black", fill = "coral") +
+  facet_grid(decade ~ .)
+p
+
+#Part 3
+d2 %>% 
+  group_by(decade) %>% 
+  summarise_at(vars(runtimeMinutes), list(mean = mean, sd = sd)) -> results
+results
+  
+#Part 4
+by_dec <- d2 %>% group_by(decade) #aggregate data by decade
+n <- 100
+s <- sample_n(by_dec, size = n, replace = FALSE)
+output <- summarize(s, mean = mean(runtimeMinutes), sd = sd(runtimeMinutes), se = sd(runtimeMinutes)/sqrt(n), se2 = sciplot::se(runtimeMinutes)) #sciplot uses a function to estimate the standard error
+output
+
+#Part 5
+output$se3 <- results$sd/sqrt(n)
+output
+```
+
+####Both SE's estimated are about the same. The SE estimated in Part 4 contains a few values that are smaller than the SE estimated in Part 5, but only by a few decimal places (2.31 vs. 2.14, etc). The differences are due to the population mean from each decade varying between 156 (in the 20's) up to 1747 (for the 70's).
+
+```{r}
+#Part 6
+reps <- 10000
+n <- 100
+sample_mean <- NULL;
+sdm <- NULL;
+sample_sd <- NULL;
+sdsd <- NULL;
+
+for (i in unique(d2$decade)){
+  ##sample distribution means (sdm)
+  sample_mean[[i]] <- do(reps) * mean(~runtimeMinutes, data = sample_n(d2[d2$decade ==  i, ], size = n, replace = FALSE))
+  sdm[i] <- favstats(~mean, data = sample_mean[[i]])$mean
+  ##sample distribution sd (sdsd)
+  sdsd[i] <- favstats(~mean, data = sample_mean[[i]])$sd*sqrt(100)
+}
+cbind(output, sdm = sdm, sdsd = sdsd)
+```
+
+##Challenge 2
+```{r}
+#dpois = exact value
+#ppois = 0-up to 'n'
+
+#Part 1
+ppois(13, lambda = 18)
+
+#Part 2
+dpois(0, lambda = 18)
+
+#Part 3
+dpois(7, lambda = 18)
+
+#Part 4
+1 - ppois(20, lambda = 18)
+
+#Part 5, Poisson mass function 0 to 40
+v <- 0:40
+s <- list(length = v)
+for (i in 1:41){
+  s[i] <- dpois(i, lambda = 18)
+}
+barplot(unlist(s))
+
+#Part 6
+sim <- rpois(520, lambda = 18)
+
+#Part 7, plot with histogram
+histogram(sim, xlim = c(0,40))
+```
+
+####The probability mass function is shaped like a normal distribution. This simulation (P7) does have somewhat of a normally distributioned shape but it's skewed to the left. This is because it embodies that, on any given Saturday morning, titi monkeys are likley to call within range of the mean (18 calls is the most probable occurence). As the number of calls decreases (veers away from the mean), the probability of that number of calls occuring also decreases (i.e the probabilty of 10 calls occuring are more likely than 3 calls) and the same is true as the number of calls surpasss the mean (18).
+
+##Challenge 3
+```{r}
+f <- "https://raw.githubusercontent.com/difiore/ADA-datasets/master/zombies.csv"
+d <- read_csv(f, col_names = TRUE)
+str(d)
+
+#Question 1
+(pop1 <- favstats(~height, data = d))
+(pop2 <- favstats(~weight, data = d))
+(pop3 <- favstats(~age, data = d))
+(pop4 <- favstats(~zombies_killed, data = d))
+(pop5 <- favstats(~years_of_education, data = d))
+
+#Question 2, scatterplots of height and weight in relation to age
+#height
+ggplot(data = d) + aes(x = age, y = height) +
+     geom_point(na.rm = TRUE) +
+  ggtitle(label = "Height vs. Age") +
+  ylab(label = "Height") +
+  xlab(label = "Age")
+#weight
+ggplot(data = d) + aes(x = age, y = weight) +
+     geom_point(na.rm = TRUE) +
+  ggtitle(label = "Weight vs. Age") +
+  ylab(label = "Weight") +
+  xlab(label = "Age")
+```
+
+####Only looking at the two graphs, both height and weight appear to be positively correlated to age
+
+```{r}
+#Question 3, histograms and Q-Q plots
+#Histograms
+par(mfrow = c(2,3))
+hist(x =d$height)
+abline(v = mean(d$height), col = "chartreuse4", lwd = 2)
+hist(x =d$weight)
+abline(v = mean(d$weight), col = "chartreuse4", lwd = 2)
+hist(x =d$age)
+abline(v = mean(d$age), col = "chartreuse4", lwd = 2)
+hist(x =d$zombies_killed) #skewed
+abline(v = mean(d$zombies_killed), col = "chartreuse4", lwd = 2)
+hist(x =d$years_of_education) #skewed
+abline(v = mean(d$years_of_education), col = "chartreuse4", lwd = 2)
+#Q-Q Plots
+par(mfrow = c(2,3))
+qqnorm(d$height, main = "height")
+qqline(d$height, col = "red")
+qqnorm(d$weight, main = "weight")
+qqline(d$weight, col = "red")
+qqnorm(d$age, main = "age")
+qqline(d$age, col = "red")
+qqnorm(d$zombies_killed, main = "zombies killed") #staircase
+qqline(d$zombies_killed, col = "red")
+qqnorm(d$years_of_education, main = "years of education") #staircase
+qqline(d$years_of_education, col = "red")
+par(mfrow = c(1,1))
+```
+
+####The number of zombies killed and the years of education appear to not be normallly distributed. The histograms are skewed and the qqplots are nonlinear.
+
+```{r}
+#Question 4
+n <- 30
+alpha <- 0.05
+s <- sample_n(d, size = n, replace = FALSE)
+
+#For height
+s_height <- favstats(~height, data = s)
+s_height
+#CF height
+ci_height <- mean(s$height) + c(-1, 1) * qnorm(1 - alpha / 2) * sd(s$height)/sqrt(n)
+ci_height
+
+#For weight
+s_weight <- favstats(~weight, data = s)
+s_weight
+#CF weight
+ci_weight <- mean(s$weight) + c(-1, 1) * qnorm(1 - alpha / 2) * sd(s$weight)/sqrt(n)
+ci_weight
+
+#For age
+s_age <- favstats(~age, data = s) 
+s_age
+#CF age
+ci_age <- mean(s$age) + c(-1, 1) * qnorm(1 - alpha / 2) * sd(s$age)/sqrt(n)
+ci_age
+
+#For zombies killed
+#sample for zombies_killed = s_zk
+s_zk <- favstats(~zombies_killed, data = s) 
+s_zk
+#CF zk
+ci_zk <- mean(s$zombies_killed) + c(-1, 1) * qnorm(1 - alpha / 2) * sd(s$zombies_killed)/sqrt(n)
+ci_zk
+
+#For years of educaton = yoe
+s_yoe <- favstats(~years_of_education, data = s)
+s_yoe
+#CF yoe
+ci_yoe <- mean(s$years_of_education) + c(-1, 1) * qnorm(1 - alpha / 2) * sd(s$years_of_education)/sqrt(n)
+ci_yoe
+
+#Question 5
+reps <- 99
+n <- 30
+s <- sample_n(d, size = n, replace = FALSE)
+
+#For height
+s_heightsd <- do(reps) * mean(~height, data = sample_n(d, size = n, replace = FALSE))
+s_height2 <- favstats(~mean, data = s_heightsd)
+s_height2_sd <- favstats(~mean, data = s_heightsd)$sd*sqrt(n)
+s_height2
+
+#For weight
+s_weightsd <- do(reps) * mean(~weight, data = sample_n(d, size = n, replace = FALSE))
+s_weight2 <- favstats(~mean, data = s_weightsd)
+s_weight2
+
+#For age
+s_agesd <- do(reps) * mean(~age, data = sample_n(d, size = n, replace = FALSE))
+s_age2 <- favstats(~mean, data = s_agesd)
+s_age2
+
+#For zombies killed
+#sample for zombies_killed = s_zk
+s_zksd <- do(reps) * mean(~zombies_killed, data = sample_n(d, size = n, replace = FALSE))
+s_zk2 <- favstats(~mean, data = s_zksd)
+s_zk2
+
+#For years of educaton
+s_yoesd <- do(reps) * mean(~years_of_education, data = sample_n(d, size = n, replace = FALSE))
+s_yoe2 <- favstats(~mean, data = s_yoesd)
+s_yoe2
+
+
+#population variance eq
+pop_var <- function(x) {
+  sum((x - mean(x))^2) / (length(x))
+}
+
+#calculating SE's using pop var
+pop_height <- sqrt(pop_var(d$height) / 1000)
+pop_weight <- sqrt(pop_var(d$weight) / 1000)
+pop_age <- sqrt(pop_var(d$age) / 1000)
+pop_zk <- sqrt(pop_var(d$zombies_killed) / 1000)
+pop_yoe <- sqrt(pop_var(d$years_of_education) / 1000)
+
+#Combining them to make it easier to see across calculations
+cbind(pop_height, s_height$sd, s_height2$sd)
+cbind(pop_weight, s_weight$sd, s_weight2$sd)
+cbind(pop_age, s_age$sd, s_age2$sd)
+cbind(pop_zk, s_zk$sd, s_zk2$sd)
+cbind(pop_yoe, s_yoe$sd, s_yoe2$sd)
+```
+
+####The estimated SE is smaller than the sample distribution and single sample SE. This is to be expected because the sample size is at 1000, thus decreasing the SE because our estimation of the mean is more certain. The sample distribution SE is smaller than the sample SE because the number of replicates are so great (100 vs. 1), thus the estimation of the mean is less variable.
+
+```{r}
+#Histograms
+par(mfrow= c(2,3)) 
+hist(s_heightsd$mean) #as expected
+abline(v = mean(s_heightsd$mean), col = "chartreuse4", lwd = 2)
+hist(s_weightsd$mean) # ""
+abline(v = mean(s_weightsd$mean), col = "chartreuse4", lwd = 2)
+hist(s_agesd$mean) # ""
+abline(v = mean(s_agesd$mean), col = "chartreuse4", lwd = 2)
+hist(s_zksd$mean) #plots normally distributed!!
+abline(v = mean(s_zksd$mean), col = "chartreuse4", lwd = 2)
+hist(s_yoesd$mean) # ""
+abline(v = mean(s_yoesd$mean), col = "chartreuse4", lwd = 2)
+
+#QQ Plots, showing only YOE & ZK, which were not normally distributed
+par(mfrow = c(1,2))
+qqnorm(s_yoesd$mean, main = "years of education") #no longer a staircase, now has a linear form
+qqline(s_yoesd$mean, col = "red")
+qqnorm(s_zksd$mean, main = "zombies killed") # ""
+qqline(s_zksd$mean, col = "red")
+```
+
+####The sample distribution of all quantitative variables appear to be normally distributed. The amazing feature about the Central Limit Theorem, is that even if data is not normally distributed, sampling distributions of this data will take this form (a normal distribution form). As stated in class, the sampling distributions appear normal and this is because our sample size is large enough and our samples are independent and identically distributed.
